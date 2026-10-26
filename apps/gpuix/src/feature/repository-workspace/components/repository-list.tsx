@@ -26,6 +26,7 @@ import type { WorkspaceEntry } from "../types";
 import { RepositoryChangeLabel } from "./repository-change-details";
 import { RepositoryCommitSubject } from "./repository-commit-subject";
 import { WorkspaceTabIcon } from "../../workspace-tabs/components/workspace-tab-icon";
+import { hasPrimaryModifier } from "../../../platform/shortcut-modifiers";
 
 import {
 	RepositoryFileMenu,
@@ -691,7 +692,7 @@ export function RepositoryList({
 									inclusion || multiselect
 										? event.modifiers?.shift
 											? "range"
-											: event.modifiers?.cmd
+											: hasPrimaryModifier(event)
 												? "toggle"
 												: undefined
 										: undefined

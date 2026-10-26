@@ -30,6 +30,7 @@ import {
 import type { Accounts } from "../../accounts/lib/accounts";
 import { accountProviderIcons } from "../../accounts/account-provider-icons";
 import { NativeFileMenu } from "../lib/native-file-menu";
+import { primaryModifierName } from "../../../platform/shortcut-modifiers";
 import {
 	WorkspaceSettingsMenu,
 	type WorkspaceSettingsChoice,
@@ -317,7 +318,7 @@ export function WorkspaceRail({
 		} catch {
 			setCatalog({
 				...current,
-				error: "Account menu unavailable. Open Settings with Command comma.",
+				error: `Account menu unavailable. Open Settings with ${primaryModifierName} comma.`,
 			});
 		}
 	};
@@ -531,8 +532,8 @@ export function WorkspaceRail({
 					}
 					label={
 						repositoryAppearance && !settingsActive
-							? "Workspace settings (Command comma opens Settings)"
-							: "Settings (Command comma)"
+							? `Workspace settings (${primaryModifierName} comma opens Settings)`
+							: `Settings (${primaryModifierName} comma)`
 					}
 					icon={icons.settings}
 					selected={settingsActive}

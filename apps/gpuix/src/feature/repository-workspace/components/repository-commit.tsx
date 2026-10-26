@@ -16,6 +16,10 @@ import {
 	AiCommitStatus,
 } from "../../ai/ai-commit-button";
 import { useAiCommit } from "../../ai/use-ai-commit";
+import {
+	hasExactlyOnePrimaryModifier,
+	primaryModifierName,
+} from "../../../platform/shortcut-modifiers";
 import type { CommitRecoveryInput } from "@1git/git";
 import type { RepositoryCommit as CommitReader } from "../lib/repository-commit";
 import {
@@ -281,8 +285,8 @@ export function RepositoryCommit({
 					aria-label="Commit message"
 					aria-description={
 						sample
-							? "First line is the summary. Add a blank line for optional details. Command Enter previews; no commit is created."
-							: `First line is the summary. Add a blank line for an optional description. Command Enter: ${label}.`
+							? `First line is the summary. Add a blank line for optional details. ${primaryModifierName} Enter previews; no commit is created.`
+							: `First line is the summary. Add a blank line for an optional description. ${primaryModifierName} Enter: ${label}.`
 					}
 					placeholder="Commit message…"
 					textColorRanges={textColorRanges}
@@ -307,10 +311,9 @@ export function RepositoryCommit({
 					onKeyDown={(event) => {
 						if (
 							event.key === "enter" &&
-							event.modifiers?.cmd &&
-							!event.modifiers.ctrl &&
-							!event.modifiers.alt &&
-							!event.modifiers.shift &&
+							hasExactlyOnePrimaryModifier(event) &&
+							!event.modifiers?.alt &&
+							!event.modifiers?.shift &&
 							!event.isHeld
 						)
 							submit();

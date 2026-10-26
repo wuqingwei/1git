@@ -7,6 +7,7 @@ import {
 import { Popover, PopoverContent } from "@1git/gpuix-ui/popover";
 import { radius, spacing, typography } from "@1git/design-tokens";
 import { useAppTheme } from "../../styles/theme";
+import { hasExactlyOnePrimaryModifier } from "../../platform/shortcut-modifiers";
 import {
 	RepositoryQuickSwitcherModel,
 	type QuickRepository,
@@ -102,10 +103,9 @@ function QuickSwitcherContent({
 	const navigate = (event: EventPayload): void => {
 		if (
 			event.key === "p" &&
-			event.modifiers?.cmd &&
-			!event.modifiers.shift &&
-			!event.modifiers.alt &&
-			!event.modifiers.ctrl &&
+			hasExactlyOnePrimaryModifier(event) &&
+			!event.modifiers?.shift &&
+			!event.modifiers?.alt &&
 			!event.isHeld
 		) {
 			onClose();

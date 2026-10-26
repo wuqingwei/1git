@@ -1,4 +1,5 @@
 import type { NativeRenderer, WindowKeyEventHandler } from "@gpuix/react";
+import { hasExactlyOnePrimaryModifier } from "../../../platform/shortcut-modifiers";
 
 /** App-owned window actions, registered only while the app is mounted. */
 export const workspaceShortcuts = new WeakMap<
@@ -48,10 +49,9 @@ export function handleWorkspaceKeyDown(
 	...[event, renderer]: Parameters<WindowKeyEventHandler>
 ): boolean {
 	if (
-		!event.modifiers?.cmd ||
-		event.modifiers.shift ||
-		event.modifiers.alt ||
-		event.modifiers.ctrl ||
+		!hasExactlyOnePrimaryModifier(event) ||
+		event.modifiers?.shift ||
+		event.modifiers?.alt ||
 		event.isHeld
 	)
 		return false;
@@ -103,10 +103,9 @@ export function handleRepositoryFilterKeyDown(
 	if (
 		!escape &&
 		(event.key !== "f" ||
-			!event.modifiers?.cmd ||
+			!hasExactlyOnePrimaryModifier(event) ||
 			event.modifiers?.shift ||
-			event.modifiers?.alt ||
-			event.modifiers?.ctrl)
+			event.modifiers?.alt)
 	)
 		return false;
 

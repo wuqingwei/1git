@@ -169,10 +169,21 @@ Runtime dependencies for the tarball (to install, not bundle):
 2. **Ubuntu 20.04 build.** Rebuild `build:native` and
    `package:linux` on a 20.04 host/container and verify the
    tarball's glibc ceiling is 2.31 before claiming 20.04 support.
-3. **Cmd -> Ctrl sweep.** Many handlers already accept `cmd || ctrl`,
-   but pure `cmd` checks (quick switcher, Cmd-click, settings
-   shortcuts) will not fire on Linux, where GPUI reports the Super key
-   as `cmd`. Map them to Ctrl on Linux, file by file, with tests.
+3. **Cmd -> Ctrl sweep: done (2026-10-26).** Audit found most
+   handlers already accepted `cmd || ctrl`, and the remaining
+   pure-`cmd` sites were mostly guards that already checked `ctrl`
+   separately (no change needed). The five truly broken triggers now
+   accept Ctrl via a shared `src/platform/shortcut-modifiers.ts`
+   (`hasExactlyOnePrimaryModifier`, so Cmd+Ctrl together still does
+   not fire): workspace shortcuts (Cmd+P/O/R/W/1-9/arrows),
+   repository filter (Cmd+F), quick-switcher close (Cmd+P), commit
+   submit (Cmd+Enter), and Cmd-click multiselect toggle (now
+   Ctrl-click). Shortcut labels for those actions show "Ctrl" off
+   macOS (`primaryModifierName`). Covered by
+   `tests/platform/shortcut-modifiers.unit.test.ts` (4 tests).
+   Remaining cosmetic label: the diff view's "Command C to copy"
+   hint was left unchanged (copy itself is OS-level text handling,
+   not a handler in this sweep).
 4. **Editor catalog on Linux.** Discover `code`, `cursor`, `zed`,
    `subl` from PATH and `.desktop` files; the current Linux branch
    only handles an explicit executable path or the default handler.

@@ -11,6 +11,7 @@ import { Button } from "@1git/gpuix-ui/button";
 import { useGpuixRequired, type PublicInstance } from "@gpuix/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { repositoryFilterShortcuts } from "../lib/repository-filter-shortcut";
+import { primaryModifierName } from "../../../platform/shortcut-modifiers";
 
 import {
 	RepositoryWorkspaceModel,
@@ -639,8 +640,8 @@ function RepositoryNavigationContent({
 						testId={view === "history" ? "filter-history" : "filter-changes"}
 						aria-label={
 							view === "history"
-								? "Search history (Command F)"
-								: "Search changed files (Command F)"
+								? `Search history (${primaryModifierName} F)`
+								: `Search changed files (${primaryModifierName} F)`
 						}
 						aria-expanded={filterOpen || historySearching}
 						variant="ghost"
