@@ -29,6 +29,13 @@ navigation in text fields. Two merge follow-ups that were stale
 build outputs, not code bugs: `packages/git/dist` had to be rebuilt
 before `check-types` passed, and `bun install` had to re-apply the
 updated `@gpuix/native` patch before the test types passed.
+Post-merge window check (2026-10-27, same evening): `dev:app` under
+Xvfb opened a real 1280x820 "1git" window showing the Welcome
+onboarding (1 of 4, Light/Dark/Auto, Skip setup / Continue),
+screenshot at `~/workspace/your_files/1git-linux-merged-window.png`.
+Getting there needed the Vulkan driver and `libxkbcommon-x11` back
+from the apt cache after a VM replacement wiped the apt layer
+(`dpkg -i` from `/var/cache/apt/archives`, no network fetch).
 
 ## Why this port is plausible
 
