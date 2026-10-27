@@ -1,10 +1,34 @@
 # Linux port (work in progress)
 
-Status: first Linux window achieved on branch `linux-port`.
-The native addon builds on Linux and `bun run dev:app` opens a real
-1git window (see "Verified"). This is still not a finished product:
-the window was verified under Xvfb on Ubuntu 24.04, not yet on a real
-GNOME X11/Wayland desktop, and the TODO list below still stands.
+Status: first Linux window achieved on branch `linux-port`, now
+merged with upstream `master` at `5b88d4c` (the 0.1.0 release
+candidate; app version is now 0.1.0). The native addon builds on
+Linux and `bun run dev:app` opens a real 1git window (see
+"Verified"). This is still not a finished product: the window was
+verified under Xvfb on Ubuntu 24.04, not yet on a real GNOME
+X11/Wayland desktop, and the TODO list below still stands.
+
+## Upstream merge (2026-10-27)
+
+Merged 41 upstream commits (`41d4d2d..5b88d4c`), including
+customizable keybinds, tree file navigation, unified settings
+panels, and the 0.1.0 release preparation. Six files conflicted
+and were resolved by hand: `native/build.ts` and `native/config.ts`
+(upstream's new application-icons patches plus the Linux
+macos-napi-methods patch, kept last), `repository-commit.tsx`,
+`repository-navigation.tsx` and `repository-filter-shortcut.ts`
+(adopted upstream's keybinds routing), and
+`repository-list.tsx` (upstream's tree navigation deleted the old
+flat-list row; the tree row's Cmd-click toggle now uses the shared
+helper). The Linux Ctrl work was reconciled with upstream keybinds
+rather than kept in parallel: `find` already had a Ctrl alias
+upstream, and Ctrl aliases were added for quick-open, open,
+refresh, close-tab, tab numbers and commit. Previous/next tab keep
+no Ctrl alias on purpose: on Linux Ctrl+Left/Right is word
+navigation in text fields. Two merge follow-ups that were stale
+build outputs, not code bugs: `packages/git/dist` had to be rebuilt
+before `check-types` passed, and `bun install` had to re-apply the
+updated `@gpuix/native` patch before the test types passed.
 
 ## Why this port is plausible
 
@@ -64,14 +88,15 @@ The blockers were 1git's own macOS gates, not the engine:
 - `src/window-options.ts`: no blurred background or traffic lights on
   Linux; the compositor's native decorations are used.
 - `native/macos-napi-methods-linux.patch` (Linux only, applied last):
-  moves five macOS-only `#[napi]` methods (`get_font_families`,
+  moves six macOS-only `#[napi]` methods (`get_font_families`,
   `get_system_appearance`, `set_window_appearance`, `set_close_blocked`,
-  `take_close_requested`) out of the main `GpuixRenderer` impl into a
-  macOS-only impl block. napi-derive registers `cfg`'d methods from
+  `take_close_requested`, plus upstream's newer
+  `get_application_icon`) out of the main `GpuixRenderer` impl into
+  a macOS-only impl block. napi-derive registers `cfg`'d methods from
   the main impl even on Linux, where their callbacks do not exist,
-  so the addon failed to compile without this move (five `E0425`
-  errors). A `cfg_attr` workaround was tried first and did not work.
-  On Linux those five methods are absent, and the TS callers already
+  so the addon failed to compile without this move (`E0425` errors).
+  A `cfg_attr` workaround was tried first and did not work.
+  On Linux those six methods are absent, and the TS callers already
   guard them with `"method" in renderer` (system appearance falls back
   to light, close protection and font list are unavailable, window
   appearance is skipped). macOS keeps the original patch stack.
@@ -169,21 +194,24 @@ Runtime dependencies for the tarball (to install, not bundle):
 2. **Ubuntu 20.04 build.** Rebuild `build:native` and
    `package:linux` on a 20.04 host/container and verify the
    tarball's glibc ceiling is 2.31 before claiming 20.04 support.
-3. **Cmd -> Ctrl sweep: done (2026-10-26).** Audit found most
-   handlers already accepted `cmd || ctrl`, and the remaining
-   pure-`cmd` sites were mostly guards that already checked `ctrl`
-   separately (no change needed). The five truly broken triggers now
-   accept Ctrl via a shared `src/platform/shortcut-modifiers.ts`
-   (`hasExactlyOnePrimaryModifier`, so Cmd+Ctrl together still does
-   not fire): workspace shortcuts (Cmd+P/O/R/W/1-9/arrows),
-   repository filter (Cmd+F), quick-switcher close (Cmd+P), commit
-   submit (Cmd+Enter), and Cmd-click multiselect toggle (now
-   Ctrl-click). Shortcut labels for those actions show "Ctrl" off
-   macOS (`primaryModifierName`). Covered by
-   `tests/platform/shortcut-modifiers.unit.test.ts` (4 tests).
-   Remaining cosmetic label: the diff view's "Command C to copy"
-   hint was left unchanged (copy itself is OS-level text handling,
-   not a handler in this sweep).
+3. **Cmd -> Ctrl sweep: done (2026-10-26), reconciled with
+   upstream keybinds (2026-10-27).** Audit found most handlers
+   already accepted `cmd || ctrl`, and the remaining pure-`cmd`
+   sites were mostly guards that already checked `ctrl` separately
+   (no change needed). After the upstream merge, workspace, filter
+   and commit shortcuts route through upstream's keybinds system,
+   so Linux Ctrl support now lives as keybind aliases there
+   (quick-open, open, refresh, close-tab, tab numbers, commit, plus
+   the pre-existing settings and find aliases); the shared
+   `src/platform/shortcut-modifiers.ts` helper remains for the
+   quick-switcher close, the tree-row Ctrl-click toggle, and the
+   rail's Settings labels. Previous/next tab deliberately have no
+   Ctrl alias (Ctrl+Left/Right is word navigation in text fields).
+   Covered by `tests/platform/shortcut-modifiers.unit.test.ts`
+   (4 tests) and upstream's keybinds tests. Remaining cosmetic
+   label: the diff view's "Command C to copy" hint was left
+   unchanged (copy itself is OS-level text handling, not a handler
+   in this sweep).
 4. **Editor catalog on Linux.** Discover `code`, `cursor`, `zed`,
    `subl` from PATH and `.desktop` files; the current Linux branch
    only handles an explicit executable path or the default handler.

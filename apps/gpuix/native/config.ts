@@ -163,11 +163,19 @@ export const scrollbarVisibilityPatchPath = resolve(
 	import.meta.dir,
 	"scrollbar-visibility.patch"
 );
+export const applicationIconsPatchPath = resolve(
+	import.meta.dir,
+	"application-icons.patch"
+);
+export const applicationIconsPlatformPatchPath = resolve(
+	import.meta.dir,
+	"application-icons-platform.patch"
+);
 export const fontFamiliesPatchPath = resolve(
 	import.meta.dir,
 	"font-families.patch"
 );
-// Linux only: moves five macOS-only #[napi] methods out of the main
+// Linux only: moves six macOS-only #[napi] methods out of the main
 // GpuixRenderer impl into a macOS-only impl block. napi-derive registers
 // cfg'd methods from the main impl even on Linux, where their callbacks
 // do not exist, so the Linux addon fails to compile without this move.
@@ -222,6 +230,8 @@ export const nativeBuildId = createHash("sha256")
 	.update(readFileSync(diffTrailingContextPatchPath))
 	.update(readFileSync(scrollbarVisibilityPatchPath))
 	.update(readFileSync(fontFamiliesPatchPath))
+	.update(readFileSync(applicationIconsPatchPath))
+	.update(readFileSync(applicationIconsPlatformPatchPath))
 	.update(readFileSync(macosNapiMethodsPatchPath))
 	.update(`${process.platform}-${process.arch}-release-v1`)
 	.digest("hex");

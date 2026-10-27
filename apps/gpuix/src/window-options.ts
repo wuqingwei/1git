@@ -9,6 +9,8 @@ import { handleRepositoryAppearanceKeyDown } from "./feature/repository-appearan
 import { handleRepositoryFilterKeyDown } from "./feature/repository-workspace/lib/repository-filter-shortcut";
 import { handleWorkspaceKeyDown } from "./feature/repository-workspace/lib/repository-filter-shortcut";
 import { handleCloneNavigation } from "./feature/repository-workspace/lib/repository-filter-shortcut";
+import { keybindRecordings } from "./feature/keybinds/keybinds";
+import { handleSyncReviewKeyDown } from "./feature/repository-comparison/repository-sync-review";
 
 /** Native window chrome and keyboard traversal. On Linux there is no AppKit
  *  vibrancy or traffic-light chrome, so the window keeps the compositor's
@@ -30,6 +32,8 @@ export const windowOptions: RenderOptions = {
 			}
 		: {}),
 	onKeyDown(event, renderer) {
+		if (keybindRecordings.get(renderer)?.(event)) return;
+
 		if (handlePopoverKeyDown(event, renderer)) return;
 
 		if (handleGuidedTourKeyDown(event, renderer)) return;
@@ -41,6 +45,8 @@ export const windowOptions: RenderOptions = {
 		if (handleSettingsNavigation(event, renderer)) return;
 
 		if (handleCloneNavigation(event, renderer)) return;
+
+		if (handleSyncReviewKeyDown(event, renderer)) return;
 
 		if (handleRepositoryFilterKeyDown(event, renderer)) return;
 

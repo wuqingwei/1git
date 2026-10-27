@@ -1,4 +1,6 @@
 import { GuidedTour, type TourTips } from "../../guided-tour/guided-tour";
+import { Keybinds, type KeybindOverrides } from "../../keybinds/keybinds";
+import type { RepositoryFileLayout } from "../../repository-workspace/lib/repository-file-tree";
 import {
 	TypographyPreferences,
 	type AppTypography,
@@ -69,15 +71,19 @@ export interface WorkspaceSessionDocument {
 	readonly repositoryDiscovery?: RepositoryDiscoveryPreferences;
 	readonly repositoryLibrary?: RepositoryLibraryPreferences;
 	readonly diffSettings?: DiffSettings;
+	readonly fileListLayout?: RepositoryFileLayout;
 	readonly appearance?: AppAppearancePreference;
 	readonly commitTypeBadges?: boolean;
+	readonly autoIncludeChanges?: boolean;
 	readonly smoothTransitions?: boolean;
 	readonly showScrollbars?: boolean;
+	readonly showGrain?: boolean;
 	readonly typography?: AppTypography;
 	readonly repositoryColors?: RepositoryColorChoices;
 	readonly repositoryPatterns?: RepositoryPatternChoices;
 	readonly onboarding?: OnboardingStep;
 	readonly tips?: TourTips;
+	readonly keybinds?: KeybindOverrides;
 }
 
 const tabIdPattern = /^workspace-([1-9]\d*)$/;
@@ -248,14 +254,23 @@ export class WorkspaceSession {
 			value.appearance === "system"
 				? { appearance: value.appearance }
 				: {}),
+			...(typeof value.autoIncludeChanges === "boolean"
+				? { autoIncludeChanges: value.autoIncludeChanges }
+				: {}),
 			...(typeof value.commitTypeBadges === "boolean"
 				? { commitTypeBadges: value.commitTypeBadges }
 				: {}),
 			...(value.typography === undefined
 				? {}
 				: { typography: TypographyPreferences.parse(value.typography) }),
+			...(typeof value.showGrain === "boolean"
+				? { showGrain: value.showGrain }
+				: {}),
 			...(typeof value.showScrollbars === "boolean"
 				? { showScrollbars: value.showScrollbars }
+				: {}),
+			...(value.fileListLayout === "list" || value.fileListLayout === "tree"
+				? { fileListLayout: value.fileListLayout }
 				: {}),
 			...(typeof value.smoothTransitions === "boolean"
 				? { smoothTransitions: value.smoothTransitions }
@@ -268,6 +283,9 @@ export class WorkspaceSession {
 				? { onboarding: value.onboarding }
 				: {}),
 			...(tips ? { tips } : {}),
+			...(value.keybinds === undefined
+				? {}
+				: { keybinds: Keybinds.parse(value.keybinds) }),
 			...(diffSettings ? { diffSettings } : {}),
 			...(Object.keys(repositoryColors).length ? { repositoryColors } : {}),
 			...(Object.keys(repositoryPatterns).length ? { repositoryPatterns } : {}),
@@ -317,10 +335,15 @@ export class WorkspaceSession {
 		smoothTransitions?: boolean,
 		showScrollbars?: boolean,
 		typography?: AppTypography,
-		tips?: TourTips
+		tips?: TourTips,
+		keybinds?: KeybindOverrides,
+		fileListLayout?: RepositoryFileLayout,
+		showGrain?: boolean
 	): WorkspaceSessionDocument {
 		return {
 			version: 1,
+			autoIncludeChanges: state.autoIncludeChanges ?? false,
+			...(fileListLayout ? { fileListLayout } : {}),
 			...(state.spaces
 				? {
 						spaces: state.spaces.map((space) =>
@@ -340,9 +363,11 @@ export class WorkspaceSession {
 				? { typography: TypographyPreferences.parse(typography) }
 				: {}),
 			...(showScrollbars !== undefined ? { showScrollbars } : {}),
+			...(showGrain !== undefined ? { showGrain } : {}),
 			...(smoothTransitions !== undefined ? { smoothTransitions } : {}),
 			...(onboarding ? { onboarding } : {}),
 			...(tips ? { tips } : {}),
+			...(keybinds && Object.keys(keybinds).length ? { keybinds } : {}),
 			...(diffSettings ? { diffSettings } : {}),
 			...(repositoryDiscovery &&
 			(repositoryDiscovery.folders.length || repositoryDiscovery.hidden.length)
@@ -391,6 +416,7 @@ export class WorkspaceSession {
 	static restore(document: WorkspaceSessionDocument): WorkspaceTabsState {
 		return {
 			preview: false,
+			autoIncludeChanges: document.autoIncludeChanges ?? false,
 			...(document.spaces
 				? {
 						spaces: document.spaces,

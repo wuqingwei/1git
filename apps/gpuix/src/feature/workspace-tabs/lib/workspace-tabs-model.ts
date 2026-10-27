@@ -31,11 +31,13 @@ export interface WorkspaceTabsState {
 	readonly activeId: string | null;
 	readonly nextId: number;
 	readonly recentRepositories?: readonly string[];
+	readonly autoIncludeChanges?: boolean;
 }
 
 /** Tab mutations are independent of the renderer and never perform filesystem work. */
 export type WorkspaceTabsAction =
 	| WorkspaceSpaceAction
+	| { type: "auto-include-changes"; enabled: boolean }
 	| { type: "home" }
 	| { type: "add"; path?: string }
 	| { type: "forget-repository"; path: string }
@@ -92,6 +94,7 @@ export class WorkspaceTabsModel {
 			action.type === "space-create" ||
 			action.type === "space-select" ||
 			action.type === "space-edit" ||
+			action.type === "space-delete" ||
 			action.type === "space-preferences"
 		)
 			return WorkspaceSpaces.reduce(state, action);
@@ -106,6 +109,9 @@ export class WorkspaceTabsModel {
 		state: WorkspaceTabsState,
 		action: Exclude<WorkspaceTabsAction, WorkspaceSpaceAction>
 	): WorkspaceTabsState {
+		if (action.type === "auto-include-changes")
+			return { ...state, autoIncludeChanges: action.enabled };
+
 		if (action.type === "home")
 			return state.activeId === null ? state : { ...state, activeId: null };
 
@@ -151,7 +157,15 @@ export class WorkspaceTabsModel {
 		}
 
 		if (action.type === "open-worktree") {
-			const owner = action.spaceId ?? state.activeSpaceId ?? "default";
+			const requestedOwner = action.spaceId ?? state.activeSpaceId ?? "default";
+
+			// Worktree creation may finish after its originating space was deleted.
+			const owner =
+				state.spaces &&
+				!state.spaces.some((space) => space.id === requestedOwner)
+					? "default"
+					: requestedOwner;
+
 			const visible = owner === (state.activeSpaceId ?? "default");
 
 			const existing = state.tabs.find(
@@ -165,7 +179,8 @@ export class WorkspaceTabsModel {
 
 			const workspace = RepositoryWorkspaceModel.reduce(
 				RepositoryWorkspaceModel.create(),
-				{ type: "loaded", snapshot: action.snapshot }
+				{ type: "loaded", snapshot: action.snapshot },
+				state.autoIncludeChanges
 			);
 
 			const tab: WorkspaceTabRecord = {
@@ -228,7 +243,8 @@ export class WorkspaceTabsModel {
 
 			const workspace = RepositoryWorkspaceModel.reduce(
 				tab.workspace,
-				action.action
+				action.action,
+				state.autoIncludeChanges
 			);
 
 			if (workspace === tab.workspace) return state;

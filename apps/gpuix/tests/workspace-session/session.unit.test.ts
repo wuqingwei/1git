@@ -10,6 +10,94 @@ import { WorkspaceTabsModel } from "../../src/feature/workspace-tabs/lib/workspa
 import { repositorySnapshot } from "../_shared/repository-snapshot";
 import { commitInfo, historyPage } from "../_shared/history-page";
 
+it("round-trips grain visibility and ignores invalid saved choices without losing tabs", () => {
+	const args: Parameters<typeof WorkspaceSession.capture> = [
+		WorkspaceTabsModel.create(),
+	];
+
+	for (const enabled of [true, false]) {
+		args[15] = enabled;
+		const saved = WorkspaceSession.parse(
+			JSON.stringify(WorkspaceSession.capture(...args))
+		);
+
+		expect(saved.showGrain).toBe(enabled);
+	}
+
+	const document = WorkspaceSession.capture(args[0]);
+
+	for (const showGrain of [undefined, null, "false", 0, {}]) {
+		const parsed = WorkspaceSession.parse(
+			JSON.stringify({ ...document, showGrain })
+		);
+
+		expect(parsed.showGrain).toBeUndefined();
+		expect(parsed.tabs).toEqual(document.tabs);
+	}
+});
+
+it.each([false, true])(
+	"persists automatic inclusion across restart (enabled: %s)",
+	(enabled) => {
+		const state = WorkspaceTabsModel.reduce(WorkspaceTabsModel.create(0), {
+			type: "auto-include-changes",
+			enabled,
+		});
+
+		const document = WorkspaceSession.parse(
+			JSON.stringify(WorkspaceSession.capture(state))
+		);
+
+		expect(document.autoIncludeChanges).toBe(enabled);
+		expect(WorkspaceSession.restore(document).autoIncludeChanges).toBe(enabled);
+	}
+);
+
+it("defaults older sessions and invalid automatic-inclusion preferences to off", () => {
+	const document = WorkspaceSession.capture(WorkspaceTabsModel.create(0));
+
+	for (const autoIncludeChanges of [undefined, null, "true", 1]) {
+		const restored = WorkspaceSession.restore(
+			WorkspaceSession.parse(
+				JSON.stringify({ ...document, autoIncludeChanges })
+			)
+		);
+
+		expect(restored.autoIncludeChanges).toBe(false);
+	}
+});
+
+it("captures keybinds and the file layout together without losing either preference", () => {
+	const args: Parameters<typeof WorkspaceSession.capture> = [
+		WorkspaceTabsModel.create(),
+	];
+
+	args[13] = { "quick-open": "cmd-k" };
+	args[14] = "tree";
+	const saved = WorkspaceSession.parse(
+		JSON.stringify(WorkspaceSession.capture(...args))
+	);
+
+	expect(saved.keybinds).toEqual({ "quick-open": "cmd-k" });
+	expect(saved.fileListLayout).toBe("tree");
+});
+
+it("validates the optional file layout without invalidating older sessions", () => {
+	const document = WorkspaceSession.capture(WorkspaceTabsModel.create());
+
+	for (const fileListLayout of ["list", "tree"] as const)
+		expect(
+			WorkspaceSession.parse(JSON.stringify({ ...document, fileListLayout }))
+				.fileListLayout
+		).toBe(fileListLayout);
+
+	for (const fileListLayout of [undefined, null, "unknown", true])
+		expect(
+			WorkspaceSession.parse(JSON.stringify({ ...document, fileListLayout }))
+				.fileListLayout
+		).toBeUndefined();
+});
+
 it("persists discovery scope and hidden suggestions without saving scan results or changing older sessions", () => {
 	const state = WorkspaceTabsModel.create();
 	const preferences = { folders: ["/Volumes/Work"], hidden: ["/test/hidden"] };

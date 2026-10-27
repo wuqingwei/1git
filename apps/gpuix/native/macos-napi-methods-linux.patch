@@ -1,6 +1,6 @@
 --- a/packages/native/src/renderer.rs
 +++ b/packages/native/src/renderer.rs
-@@ -1191,19 +1191,7 @@
+@@ -1191,20 +1191,6 @@
          }
      }
  
@@ -10,27 +10,37 @@
 -    pub fn set_close_blocked(&self, blocked: bool) {
 -        self.close_protection.0.lock().unwrap().0 = blocked;
 -    }
- 
+-
 -    /// Consume a blocked close/quit attempt without queuing a later quit.
 -    #[cfg(target_os = "macos")]
 -    #[napi]
 -    pub fn take_close_requested(&self) -> bool {
 -        std::mem::take(&mut self.close_protection.0.lock().unwrap().1)
 -    }
- 
+-
      /// Initialize GPUI using the native event-loop architecture for this OS.
      #[napi]
-@@ -1822,39 +1810,8 @@
+     pub fn init(&self, options: Option<WindowOptions>) -> Result<()> {
+@@ -1822,49 +1808,6 @@
          ))
      }
  
+-    /// Return a bounded AppKit PNG without launching the application.
+-    #[cfg(target_os = "macos")]
+-    #[napi]
+-    pub fn get_application_icon(&self, path: String) -> Result<Option<Buffer>> {
+-        gpui_macos::application_icon_png(&path)
+-            .map(|image| image.map(Buffer::from))
+-            .map_err(|error| Error::from_reason(error.to_string()))
+-    }
+-
 -    /// Installed CoreText families, without opening a system font panel.
 -    #[cfg(target_os = "macos")]
 -    #[napi]
 -    pub fn get_font_families(&self) -> Vec<String> {
 -        crate::installed_font_families()
 -    }
- 
+-
 -    /// Read the OS preference, unaffected by an explicit per-window appearance.
 -    #[cfg(target_os = "macos")]
 -    #[napi]
@@ -40,7 +50,7 @@
 -            _ => "light",
 -        }.to_string()
 -    }
- 
+-
 -    /// Match this window's AppKit material and menus to its explicit app theme.
 -    #[cfg(target_os = "macos")]
 -    #[napi]
@@ -57,13 +67,15 @@
 -            Ok(())
 -        })?
 -    }
- 
+-
      #[napi]
      pub fn set_window_title(&self, title: String) -> Result<()> {
-@@ -7546,3 +7503,56 @@
+         #[cfg(target_os = "macos")]
+@@ -7555,3 +7498,66 @@
          }
      }
  }
++
 +
 +#[cfg(target_os = "macos")]
 +#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
@@ -81,6 +93,15 @@
 +    #[napi]
 +    pub fn take_close_requested(&self) -> bool {
 +        std::mem::take(&mut self.close_protection.0.lock().unwrap().1)
++    }
++
++    /// Return a bounded AppKit PNG without launching the application.
++    #[cfg(target_os = "macos")]
++    #[napi]
++    pub fn get_application_icon(&self, path: String) -> Result<Option<Buffer>> {
++        gpui_macos::application_icon_png(&path)
++            .map(|image| image.map(Buffer::from))
++            .map_err(|error| Error::from_reason(error.to_string()))
 +    }
 +
 +    /// Installed CoreText families, without opening a system font panel.
@@ -117,3 +138,4 @@
 +        })?
 +    }
 +}
+\ No newline at end of file

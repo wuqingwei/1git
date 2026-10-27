@@ -49,6 +49,8 @@ import {
 	diffTrailingContextPatchPath,
 	scrollbarVisibilityPatchPath,
 	fontFamiliesPatchPath,
+	applicationIconsPatchPath,
+	applicationIconsPlatformPatchPath,
 	scrollMetricsPatchPath,
 	menuPlacementPlatformPatchPath,
 	systemAppearancePatchPath,
@@ -160,7 +162,9 @@ if (
 		diffTrailingContextPatchPath,
 		scrollbarVisibilityPatchPath,
 		fontFamiliesPatchPath,
-		// Linux only, applied last: moves five macOS-only #[napi] methods
+		applicationIconsPatchPath,
+		applicationIconsPlatformPatchPath,
+		// Linux only, applied last: moves six macOS-only #[napi] methods
 		// out of the main GpuixRenderer impl. napi-derive registers cfg'd
 		// methods from the main impl even where their callbacks do not
 		// exist, so without this the Linux addon does not compile.
@@ -184,7 +188,8 @@ if (
 			patch === roundedOverflowPlatformPatchPath ||
 			patch === windowAppearancePlatformPatchPath ||
 			patch === systemAppearancePlatformPatchPath ||
-			patch === menuPlacementPlatformPatchPath
+			patch === menuPlacementPlatformPatchPath ||
+			patch === applicationIconsPlatformPatchPath
 				? resolve(source, "zed")
 				: source;
 
@@ -212,7 +217,8 @@ if (
 			patch === roundedOverflowPlatformPatchPath ||
 			patch === windowAppearancePlatformPatchPath ||
 			patch === systemAppearancePlatformPatchPath ||
-			patch === menuPlacementPlatformPatchPath
+			patch === menuPlacementPlatformPatchPath ||
+			patch === applicationIconsPlatformPatchPath
 				? resolve(source, "zed")
 				: source;
 

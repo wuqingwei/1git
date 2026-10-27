@@ -18,6 +18,11 @@ import {
 } from "./feature/spaces/workspace-spaces";
 import { SpaceSwitcher } from "./feature/spaces/space-switcher";
 import { SpaceManager, SpacesSettings } from "./feature/spaces/space-manager";
+import { Keybinds } from "./feature/keybinds/keybinds";
+import {
+	KeybindContext,
+	useKeybinds,
+} from "./feature/keybinds/keybind-context";
 import { OnboardingSpaces } from "./feature/onboarding/onboarding-spaces";
 import { MachineContext } from "./feature/machines/machine-context";
 import { RemoteFolderPicker } from "./feature/machines/remote-folder-picker";
@@ -88,6 +93,10 @@ import {
 import { useWorkspaceSession } from "./feature/workspace-tabs/hooks/use-workspace-session";
 
 import { RepositoryNavigation } from "./feature/repository-workspace/components/repository-navigation";
+import {
+	RepositoryFileViewProvider,
+	useRepositoryFileLayout,
+} from "./feature/repository-workspace/components/repository-file-view";
 import { RepositoryFileActions } from "./feature/repository-workspace/lib/repository-file-actions";
 import { RepositoryDiffEmpty } from "./feature/repository-workspace/components/repository-diff-empty";
 import { RepositoryDiff } from "./feature/repository-workspace/components/repository-diff";
@@ -132,6 +141,7 @@ import { WorkspaceRail } from "./feature/repository-workspace/components/workspa
 import { RepositorySyncButton } from "./feature/repository-workspace/components/repository-sync-button";
 import type { RepositoryView } from "./feature/repository-workspace/types";
 import { RepositoryComparison } from "./feature/repository-comparison/repository-comparison";
+import { RepositorySyncReview } from "./feature/repository-comparison/repository-sync-review";
 import { RepositoryComparison as ComparisonReader } from "./feature/repository-comparison/lib/repository-comparison";
 import { RepositoryPullRequest } from "./feature/repository-pull-request/repository-pull-request";
 import { RepositoryPullRequestView } from "./feature/repository-pull-request/repository-pull-request-view";
@@ -151,6 +161,20 @@ export function App({
 }: ComponentProps<typeof AppContent> & { ai?: AiIntegration }) {
 	const renderer = useGpuixRequired();
 
+	const [keybindOverrides, setKeybindOverrides] = useState(() =>
+		Keybinds.parse(props.initialSession?.keybinds)
+	);
+
+	const keybindContext = useMemo(
+		() => ({ overrides: keybindOverrides, setOverrides: setKeybindOverrides }),
+		[keybindOverrides]
+	);
+
+	useLayoutEffect(
+		() => Keybinds.register(renderer, keybindOverrides),
+		[renderer, keybindOverrides]
+	);
+
 	const [appearancePreference, setAppearance] =
 		useState<AppAppearancePreference>(
 			props.initialSession?.appearance ?? "system"
@@ -167,6 +191,10 @@ export function App({
 
 	const [typographyPreferences, setTypography] = useState(() =>
 		TypographyPreferences.parse(props.initialSession?.typography)
+	);
+
+	const [showGrain, setShowGrain] = useState(
+		props.initialSession?.showGrain ?? true
 	);
 
 	const [showScrollbars, setShowScrollbars] = useState(
@@ -192,6 +220,8 @@ export function App({
 			tokens: { ...appThemes[appearance].tokens, showScrollbars },
 			typography: typographyPreferences,
 			setTypography,
+			showGrain,
+			setShowGrain,
 			showScrollbars,
 			setShowScrollbars,
 			appearancePreference,
@@ -206,19 +236,26 @@ export function App({
 			appearancePreference,
 			commitTypeBadges,
 			smoothTransitions,
+			showGrain,
 			showScrollbars,
 			typographyPreferences,
 		]
 	);
 
 	return (
-		<AppThemeContext value={theme}>
-			<AiProvider service={ai}>
-				<MachineContext value={props.machines ?? Machines.shared}>
-					<AppContent {...props} />
-				</MachineContext>
-			</AiProvider>
-		</AppThemeContext>
+		<KeybindContext value={keybindContext}>
+			<AppThemeContext value={theme}>
+				<RepositoryFileViewProvider
+					initialLayout={props.initialSession?.fileListLayout}
+				>
+					<AiProvider service={ai}>
+						<MachineContext value={props.machines ?? Machines.shared}>
+							<AppContent {...props} />
+						</MachineContext>
+					</AiProvider>
+				</RepositoryFileViewProvider>
+			</AppThemeContext>
+		</KeybindContext>
 	);
 }
 
@@ -663,6 +700,9 @@ function AppContent({
 		(tab) => tab.id === onboardingId
 	)?.workspace;
 
+	const { overrides: keybindOverrides } = useKeybinds();
+	const { layout: fileListLayout } = useRepositoryFileLayout();
+
 	const session = useWorkspaceSession(
 		state,
 		saveSession,
@@ -678,7 +718,10 @@ function AppContent({
 		theme.smoothTransitions,
 		theme.showScrollbars,
 		theme.typography,
-		tips
+		tips,
+		keybindOverrides,
+		fileListLayout,
+		theme.showGrain
 	);
 
 	useEffect(() => {
@@ -928,13 +971,19 @@ function AppContent({
 	const settingsAppearanceDirectory =
 		appearanceTarget?.workspace.repository?.commonDirectory;
 
+	const settingsPattern = settingsAppearanceDirectory
+		? RepositoryPatterns.selection(
+				repositoryPatterns[settingsAppearanceDirectory],
+				settingsAppearanceDirectory
+			)
+		: undefined;
+
 	const settingsRepositoryAppearance = settingsAppearanceDirectory
 		? {
 				color: repositoryColors[settingsAppearanceDirectory],
-				pattern: RepositoryPatterns.selection(
-					repositoryPatterns[settingsAppearanceDirectory],
-					settingsAppearanceDirectory
-				)?.id,
+				pattern: settingsPattern?.id,
+				patternSeed: settingsPattern?.seed,
+				patternAdjustments: settingsPattern?.adjustments,
 			}
 		: undefined;
 
@@ -1272,6 +1321,7 @@ function AppContent({
 	);
 
 	const closeSettings = useCallback(() => {
+		setSpaceEditor(undefined);
 		setSettingsView(null);
 		const focused = workspaceFocus.current;
 
@@ -1296,10 +1346,11 @@ function AppContent({
 			if (target !== null && target !== undefined)
 				renderer.focusElement?.(target);
 		}, 0);
-	}, [renderer, setSettingsView]);
+	}, [renderer, setSettingsView, setSpaceEditor]);
 
 	const openAppearance = (
-		section: RepositoryAppearanceSection = "color"
+		section: RepositoryAppearanceSection = "color",
+		draft?: RepositoryAppearanceValue
 	): void => {
 		const repository = appearanceTarget?.workspace.repository;
 
@@ -1328,7 +1379,7 @@ function AppContent({
 			commonDirectory: repository.commonDirectory,
 			name: appearanceTarget.name,
 			section,
-			draft: {
+			draft: draft ?? {
 				color: repositoryColors[repository.commonDirectory],
 				pattern: selection?.id,
 				patternSeed:
@@ -1348,11 +1399,10 @@ function AppContent({
 		closeSettings();
 	};
 
-	const saveAppearance = (value: RepositoryAppearanceValue): void => {
-		if (!appearanceEditing) return;
-
-		const directory = appearanceEditing.commonDirectory;
-
+	const applyRepositoryAppearance = (
+		directory: string,
+		value: RepositoryAppearanceValue
+	): void => {
 		setRepositoryColors((choices) =>
 			RepositoryColors.set(choices, directory, value.color)
 		);
@@ -1365,6 +1415,12 @@ function AppContent({
 				value.patternAdjustments
 			)
 		);
+	};
+
+	const saveAppearance = (value: RepositoryAppearanceValue): void => {
+		if (!appearanceEditing) return;
+
+		applyRepositoryAppearance(appearanceEditing.commonDirectory, value);
 		setAppearanceEditor(undefined);
 		closeSettings();
 	};
@@ -1416,9 +1472,57 @@ function AppContent({
 		};
 	}, [renderer, openSettings]);
 
+	const selectSpace = useCallback(
+		(id: string) => {
+			setQuickSwitcherOpen(false);
+			setFolderPickerRoot(undefined);
+			setMachineError(null);
+			setSettingsView(null);
+			dispatch({ type: "space-select", id });
+		},
+		[
+			setQuickSwitcherOpen,
+			setFolderPickerRoot,
+			setMachineError,
+			setSettingsView,
+			dispatch,
+		]
+	);
+
+	const moveSpace = useCallback(
+		(direction: SpaceDirection): boolean => {
+			if (onboardingOpen || connection.pickingId !== null) return false;
+
+			const destination = WorkspaceSpaces.destination(
+				state.spaces ?? [],
+				activeSpaceId,
+				direction
+			);
+
+			if (!destination) return false;
+
+			selectSpace(destination);
+
+			return true;
+		},
+		[
+			onboardingOpen,
+			connection.pickingId,
+			state.spaces,
+			activeSpaceId,
+			selectSpace,
+		]
+	);
+
 	useEffect(() => {
 		workspaceShortcuts.set(renderer, (key) => {
 			if (onboardingOpen) return;
+
+			if (key === "previous-space" || key === "next-space") {
+				moveSpace(key === "previous-space" ? "previous" : "next");
+
+				return;
+			}
 
 			if (key === "p") {
 				if (!settingsOpen && connection.pickingId === null)
@@ -1475,6 +1579,7 @@ function AppContent({
 		};
 	}, [
 		renderer,
+		moveSpace,
 		state.tabs,
 		visibleTabs,
 		state.nextId,
@@ -1553,32 +1658,13 @@ function AppContent({
 		}
 	};
 
-	const selectSpace = (id: string) => {
-		setQuickSwitcherOpen(false);
-		setFolderPickerRoot(undefined);
-		setMachineError(null);
-		setSettingsView(null);
-		dispatch({ type: "space-select", id });
-	};
-
 	const manageSpaces = () => {
 		openSettings();
 		setSettingsSection("spaces");
 	};
 
 	const swipeSpace = (direction: SpaceDirection): void => {
-		if (connection.pickingId !== null) return;
-
-		const destination = WorkspaceSpaces.destination(
-			state.spaces ?? [],
-			activeSpace.id,
-			direction
-		);
-
-		if (destination) {
-			selectSpace(destination);
-			completeTip("space-swipe");
-		}
+		if (moveSpace(direction)) completeTip("space-swipe");
 	};
 
 	const spaceSwitcher = (disabled: boolean) => (
@@ -1589,18 +1675,44 @@ function AppContent({
 			spaces={state.spaces ?? []}
 			activeId={activeSpace.id}
 			onSelect={selectSpace}
-			onCreate={() => setSpaceEditor({})}
+			onCreate={() => {
+				manageSpaces();
+				setSpaceEditor({});
+			}}
 			onManage={manageSpaces}
 		/>
 	);
 
 	const spacesSettings = (
 		<SpacesSettings
+			editor={spaceEditor}
+			onCancel={() => setSpaceEditor(undefined)}
+			onSave={(value) => {
+				if (spaceEditor?.space)
+					dispatch({ type: "space-edit", id: spaceEditor.space.id, ...value });
+				else
+					dispatch({
+						type: "space-create",
+						space: { id: randomUUID(), ...value, repositories: [] },
+						discovery: discoveryPreferences,
+						library: repositoryLibrary,
+					});
+
+				setSpaceEditor(undefined);
+			}}
+			tabCounts={Object.fromEntries(
+				(state.spaces ?? []).map((space) => [
+					space.id,
+					state.tabs.filter((tab) => (tab.spaceId ?? "default") === space.id)
+						.length,
+				])
+			)}
 			spaces={state.spaces ?? []}
 			activeId={activeSpace.id}
 			onCreate={() => setSpaceEditor({})}
 			onEdit={(space) => setSpaceEditor({ space })}
 			onSelect={selectSpace}
+			onDelete={(id) => dispatch({ type: "space-delete", id })}
 		/>
 	);
 
@@ -1734,7 +1846,7 @@ function AppContent({
 												workspace.repository.commonDirectory
 											)
 										}
-										onCompare={(data) => {
+										onCompare={(data, intent) => {
 											const repository = workspace.repository;
 
 											if (!repository?.head) return;
@@ -1742,16 +1854,26 @@ function AppContent({
 											dispatch({
 												type: "compare",
 												id: activeTab.id,
-												comparison: {
-													root: repository.root,
-													base: repository.head,
-													baseName: repository.branchName ?? "HEAD",
-													branches: data.branches.branches.map((item) => ({
-														value: item.fullName,
-														label: item.name,
-														oid: item.oid,
-													})),
-												},
+												comparison:
+													intent === "sync" && repository.branchName
+														? ComparisonReader.syncRequest(
+																repository.root,
+																repository.head,
+																repository.branchName,
+																data
+															)
+														: {
+																root: repository.root,
+																base: repository.head,
+																baseName: repository.branchName ?? "HEAD",
+																branches: data.branches.branches.map(
+																	(item) => ({
+																		value: item.fullName,
+																		label: item.name,
+																		oid: item.oid,
+																	})
+																),
+															},
 											});
 										}}
 										onPreviewPullRequest={() => {
@@ -2188,6 +2310,7 @@ function AppContent({
 						/>
 					) : activeTab?.comparison?.intent === "pull-request" && workspace ? (
 						<RepositoryPullRequestView
+							fileTreeScope={activeTab.id}
 							key={`${activeTab.id}:pull-request`}
 							root={activeTab.comparison.root}
 							state={workspace}
@@ -2205,8 +2328,27 @@ function AppContent({
 							diffSettings={diffSettings}
 							onDiffSettingsChange={setDiffSettings}
 						/>
+					) : activeTab?.comparison?.intent === "sync" && workspace ? (
+						<RepositorySyncReview
+							fileTreeScope={activeTab.id}
+							key={`${activeTab.id}:${activeTab.comparison.base}:${activeTab.comparison.incoming}:${activeTab.comparison.branches.map((branch) => branch.oid).join(":")}`}
+							request={activeTab.comparison}
+							state={workspace}
+							onClose={() => dispatch({ type: "compare", id: activeTab.id })}
+							onIntegrate={(choice) =>
+								mutations.changeBranch(activeTab.id, choice)
+							}
+							readComparison={readComparison}
+							readHistory={readHistory}
+							readCommitFiles={readCommitFiles}
+							readDiff={readDiff}
+							previewCache={previewCache}
+							diffSettings={diffSettings}
+							onDiffSettingsChange={setDiffSettings}
+						/>
 					) : activeTab?.comparison ? (
 						<RepositoryComparison
+							fileTreeScope={activeTab.id}
 							key={activeTab.id}
 							request={activeTab.comparison}
 							readComparison={readComparison}
@@ -2277,6 +2419,7 @@ function AppContent({
 					  workspace?.repository &&
 					  workspace.view === "graph" ? (
 						<RepositoryGraph
+							fileTreeScope={activeTab.id}
 							key={`graph:${activeTab.id}:${workspace.repository.root}`}
 							root={workspace.repository.root}
 							head={workspace.repository.head}
@@ -2330,8 +2473,14 @@ function AppContent({
 							}
 							statusError={workspace.error}
 							readDiff={readDiff}
-							onResolve={(hash, side) =>
-								mutations.resolve(activeTab.id, comparison.path, hash, side)
+							onResolve={(hash, side, expectedSideOid) =>
+								mutations.resolve(
+									activeTab.id,
+									comparison.path,
+									hash,
+									side,
+									expectedSideOid
+								)
 							}
 							openConflictEditor={launchConflict}
 						/>
@@ -2512,8 +2661,9 @@ function AppContent({
 						) : null}
 					</Onboarding>
 				) : null}
-				{spaceEditor ? (
+				{spaceEditor && onboardingOpen ? (
 					<SpaceManager
+						presentation="dialog"
 						key={spaceEditor.space?.id ?? "new"}
 						space={spaceEditor.space}
 						onClose={() => setSpaceEditor(undefined)}
@@ -2605,10 +2755,25 @@ function AppContent({
 									}
 								: undefined
 						}
+						autoIncludeChanges={state.autoIncludeChanges ?? false}
+						onAutoIncludeChanges={(enabled) =>
+							dispatch({ type: "auto-include-changes", enabled })
+						}
 						readGitSettings={readGitSettings}
 						repositoryAppearance={settingsRepositoryAppearance}
 						repositoryAppearanceName={appearanceTarget?.name}
-						onCustomizeRepositoryAppearance={() => openAppearance()}
+						onCustomizeRepositoryAppearance={(draft) =>
+							openAppearance("color", draft)
+						}
+						onChangeRepositoryAppearance={
+							settingsAppearanceDirectory
+								? (value) =>
+										applyRepositoryAppearance(
+											settingsAppearanceDirectory,
+											value
+										)
+								: undefined
+						}
 						writeGitSettings={mutations.saveSettings}
 					>
 						{closeNotice}
